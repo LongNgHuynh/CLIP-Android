@@ -53,12 +53,21 @@ dependencies {
     // ObjectBox - vector database
     debugImplementation("io.objectbox:objectbox-android-objectbrowser:4.0.0")
     releaseImplementation("io.objectbox:objectbox-android:4.0.0")
+    implementation("com.github.bumptech.glide:glide:4.12.0")
 
     // Coil - image loading library
     implementation(libs.coil)
     implementation(libs.coil.compose)
 
+
     implementation(files("libs/clip.aar"))
+// Thêm thư viện để gọi API Hugging Face
+    implementation("com.squareup.okhttp3:okhttp:4.11.0")
+
+    implementation("com.google.code.gson:gson:2.9.0")  // Gson cho parse JSON
+
+    // Thêm Kotlin Coroutines để hỗ trợ suspend function
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
