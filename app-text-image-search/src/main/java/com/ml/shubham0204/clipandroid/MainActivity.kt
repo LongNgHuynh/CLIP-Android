@@ -292,22 +292,22 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun QueryInput(viewModel: MainActivityViewModel) {
+    fun QueryInput(viewModel: MainActivityViewModel) {
         var queryText by remember { viewModel.queryTextState }
         val keyboardController = LocalSoftwareKeyboardController.current
+        val context = LocalContext.current // Lấy context từ LocalContext
+
         Row(
             modifier = Modifier.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextField(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 value = queryText,
                 onValueChange = { queryText = it },
                 shape = RoundedCornerShape(16.dp),
                 colors = TextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    focusedTextColor = Color.Black,
                     disabledTextColor = Color.Transparent,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
@@ -318,13 +318,10 @@ class MainActivity : ComponentActivity() {
             Spacer(modifier = Modifier.width(8.dp))
             IconButton(
                 enabled = queryText.isNotEmpty(),
-                modifier = Modifier.background(
-                    MaterialTheme.colorScheme.primary,
-                    CircleShape
-                ),
+                modifier = Modifier.background(Color.Blue, CircleShape),
                 onClick = {
                     keyboardController?.hide()
-                    viewModel.processQuery()
+                    viewModel.processQuery(context) // Truyền context vào đây
                 }
             ) {
                 Icon(

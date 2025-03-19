@@ -24,7 +24,7 @@ import android.util.Log
 
 
 class MainActivityViewModel : ViewModel() {
-
+    private val translator = Translator()
     val selectedImagesUriListState = mutableStateOf<List<Uri>>(emptyList())
     val queryTextState = mutableStateOf("")
     val isLoadingModelState = mutableStateOf(true)
@@ -58,27 +58,41 @@ class MainActivityViewModel : ViewModel() {
         }
     }
 
-    fun processQuery() {
+    fun processQuery(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
             mainScope { isInferenceRunningState.value = true }
-            val textEmbedding =
-                clipAndroid.encodeText(
-                    queryTextState.value.lowercase(),
+
+            try {
+                // Dịch văn bản từ tiếng Việt sang tiếng Anh
+                val translatedText = withContext(Dispatchers.IO) {
+                    translator.translateText(queryTextState.value.lowercase())
+                }
+                Log.d("Translator", "Văn bản đã dịch: $translatedText")
+
+                // Encode văn bản đã dịch
+                val textEmbedding = clipAndroid.encodeText(
+                    translatedText,
                     NUM_THREADS,
                     embeddingDim,
                     true
                 )
-            val vectorSearchResults = imagesDB.nearestNeighbors(textEmbedding)
-            mainScope {
-                vectorSearchResultsState.value = vectorSearchResults
-                selectedImagesUriListState.value =
-                    vectorSearchResults.imageEntities
-                        .filterIndexed { index, imageEntity ->
-                            vectorSearchResults.scores[index] <= threshold
-                        }
-                        .map { Uri.parse(it.uri) }
-                isInferenceRunningState.value = false
-                isShowingResultsState.value = true
+                val vectorSearchResults = imagesDB.nearestNeighbors(textEmbedding)
+                mainScope {
+                    vectorSearchResultsState.value = vectorSearchResults
+                    selectedImagesUriListState.value =
+                        vectorSearchResults.imageEntities
+                            .filterIndexed { index, imageEntity ->
+                                vectorSearchResults.scores[index] <= threshold
+                            }
+                            .map { Uri.parse(it.uri) }
+                    isInferenceRunningState.value = false
+                    isShowingResultsState.value = true
+                }
+            } catch (e: Exception) {
+                Log.e("ProcessQuery", "Lỗi khi xử lý truy vấn: ${e.message}")
+                mainScope {
+                    isInferenceRunningState.value = false
+                }
             }
         }
     }
