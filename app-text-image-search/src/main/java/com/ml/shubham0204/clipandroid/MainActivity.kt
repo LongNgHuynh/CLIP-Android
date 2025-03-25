@@ -75,6 +75,17 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.core.app.ActivityCompat
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.window.DialogProperties
+import android.net.Uri
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.runtime.saveable.rememberSaveable
 
 class MainActivity : ComponentActivity() {
 
@@ -100,9 +111,59 @@ class MainActivity : ComponentActivity() {
         setContent {
             CLIPAndroidTheme {
                 val viewModel: MainActivityViewModel = viewModel()
+                var showLoadImagesDialog by remember { mutableStateOf(true) }
+                val context = LocalContext.current
+
+                // Load images dialog shown on start
+                if (showLoadImagesDialog) {
+                    Dialog(onDismissRequest = { showLoadImagesDialog = false }) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "Load All Images",
+                                    style = MaterialTheme.typography.headlineSmall
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Do you want to load all images from your device?",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Button(
+                                        onClick = { showLoadImagesDialog = false },
+                                        colors = ButtonDefaults.textButtonColors()
+                                    ) {
+                                        Text("No")
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Button(
+                                        onClick = {
+                                            showLoadImagesDialog = false
+                                            viewModel.loadAllImagesFromMediaStore(context)
+                                        },
+                                        colors = ButtonDefaults.textButtonColors()
+                                    ) {
+                                        Text("Yes")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Rest of your UI
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    // Changed from bottomBar to topBar to display at the top
                     topBar = { CustomBottomBar(viewModel) }
                 ) { innerPadding ->
                     Column(
@@ -161,8 +222,6 @@ class MainActivity : ComponentActivity() {
                     Row {
                         AddPhotos(viewModel)
                         Spacer(modifier = Modifier.width(4.dp))
-                        LazyLoadAllImages(viewModel)
-                        Spacer(modifier = Modifier.width(4.dp))
                         RemoveAllPhotos(viewModel)
                         Spacer(modifier = Modifier.width(4.dp))
                         AppTooltip(tooltip = "Model Info") {
@@ -182,23 +241,6 @@ class MainActivity : ComponentActivity() {
                     )
                     Spacer(modifier = Modifier.width(48.dp))
                 }
-            }
-        }
-    }
-
-    @Composable
-    private fun LazyLoadAllImages(viewModel: MainActivityViewModel) {
-        val context = LocalContext.current
-        AppTooltip(tooltip = "Load All Images") {
-            IconButton(onClick = {
-                viewModel.loadAllImagesFromMediaStore(context)
-            }) {
-                // Uncomment and use the appropriate icon if needed.
-                // Icon(
-                //     imageVector = Icons.Default.PhotoLibrary,
-                //     contentDescription = "Load All Images",
-                //     tint = MaterialTheme.colorScheme.onPrimary
-                // )
             }
         }
     }
@@ -262,10 +304,64 @@ class MainActivity : ComponentActivity() {
         AppAlertDialog()
     }
 
+    @OptIn(ExperimentalFoundationApi::class)
+    @Composable
+    private fun ViewMediaDialog(
+        images: List<Uri>,
+        initialIndex: Int,
+        onDismiss: () -> Unit
+    ) {
+        val pagerState = rememberPagerState(
+            initialPage = initialIndex
+        ) { images.size }
+
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnBackPress = true,
+                dismissOnClickOutside = true
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                HorizontalPager(
+                    state = pagerState
+                ) { page ->
+                    AsyncImage(
+                        model = images[page],
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = Color.White
+                    )
+                }
+            }
+        }
+    }
+
     @Composable
     private fun ColumnScope.PhotosList(viewModel: MainActivityViewModel) {
         val selectedImagesUris by remember { viewModel.selectedImagesUriListState }
+        var selectedImageIndex by remember { mutableStateOf<Int?>(null) }
+
         LaunchedEffect(0) { viewModel.loadImages() }
+
         LazyVerticalStaggeredGrid(
             modifier = Modifier
                 .background(Color.Transparent)
@@ -274,11 +370,14 @@ class MainActivity : ComponentActivity() {
             columns = StaggeredGridCells.Fixed(2),
             contentPadding = PaddingValues(4.dp)
         ) {
-            items(selectedImagesUris) { uri ->
+            items(selectedImagesUris.toList()) { uri ->
                 Card(
                     modifier = Modifier.padding(4.dp),
                     shape = RoundedCornerShape(8.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    onClick = {
+                        selectedImageIndex = selectedImagesUris.indexOf(uri)
+                    }
                 ) {
                     AsyncImage(
                         modifier = Modifier.fillMaxWidth(),
@@ -288,6 +387,15 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+
+        // Show fullscreen viewer when image is selected
+        selectedImageIndex?.let { index ->
+            ViewMediaDialog(
+                images = selectedImagesUris.toList(),
+                initialIndex = index,
+                onDismiss = { selectedImageIndex = null }
+            )
         }
     }
 
