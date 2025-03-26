@@ -48,10 +48,11 @@ class ImageReader(
             val projection = arrayOf(
                 MediaStore.Images.Media._ID,
                 MediaStore.Images.Media.DISPLAY_NAME,
-                MediaStore.Images.Media.DATE_ADDED
+                MediaStore.Images.Media.DATE_ADDED,
+                MediaStore.Images.Media.BUCKET_DISPLAY_NAME
             )
 
-            val imageFiles = mutableListOf<Pair<Uri, Long>>() // (URI, Date)
+            val imageFiles = mutableListOf<ImageEntity>() // (URI, Date)
             context.contentResolver.query(
                 queryUri,
                 projection,
@@ -61,18 +62,26 @@ class ImageReader(
             )?.use { cursor ->
                 val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
                 val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+                val albumColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idColumn)
                     val date = cursor.getLong(dateColumn)
+                    val album = cursor.getString(albumColumn) ?: "Unknown"
                     val contentUri = ContentUris.withAppendedId(queryUri, id)
-                    imageFiles.add(contentUri to date)
+                    imageFiles.add(
+                        ImageEntity(
+                            uri = contentUri.toString(),
+                            date = date,
+                            album = album
+                        )
+                    )
                 }
             }
 
             // Process images via a flow.
             flow {
-                imageFiles.forEach { (uri, _) ->
-                    val bitmap = getFixedBitmap(context, uri)
+                imageFiles.forEach { imageEntity ->
+                    val bitmap = getFixedBitmap(context, Uri.parse(imageEntity.uri))
                     val resizedBitmap = Bitmap.createScaledBitmap(
                         bitmap,
                         clipAndroid.visionHyperParameters?.imageSize ?: 224,
@@ -80,11 +89,11 @@ class ImageReader(
                         true
                     )
                     val imageBuffer = bitmapToByteBuffer(resizedBitmap)
-                    emit(Pair(imageBuffer, uri))
+                    emit(Triple(imageBuffer, Uri.parse(imageEntity.uri), imageEntity))
                 }
             }
                 .buffer()
-                .collect { (imageBuffer, uri) ->
+                .collect { (imageBuffer, uri, imageEntity) ->
                     val imageEmbedding = clipAndroid.encodeImageNoResize(
                         imageBuffer,
                         clipAndroid.visionHyperParameters?.imageSize ?: 224,
@@ -93,7 +102,11 @@ class ImageReader(
                         512, // embeddingDim
                         true
                     )
-                    imagesDB.add(uri.toString(), imageEmbedding)
+                    imageEntity.album?.let {
+                        imagesDB.add(uri.toString(), imageEmbedding, imageEntity.date,
+                            it
+                        )
+                    }
                     // Call the suspend callback after processing each image.
                     onImageProcessed?.invoke()
                 }

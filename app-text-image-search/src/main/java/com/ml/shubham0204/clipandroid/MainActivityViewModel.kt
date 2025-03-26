@@ -104,46 +104,29 @@ class MainActivityViewModel : ViewModel() {
         }
     }
 
+    // In MainActivityViewModel.kt
     fun addImagesToDB(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
-            mainScope { isInsertingImagesState.value = true }
-            flow {
-                    selectedImagesUriListState.value.forEach { uri ->
-                        val bitmap = getFixedBitmap(context, uri)
-                        val resizedBitmap =
-                            Bitmap.createScaledBitmap(
-                                bitmap,
-                                visionHyperParameters?.imageSize ?: 224,
-                                visionHyperParameters?.imageSize ?: 224,
-                                true
-                            )
-                        val imageBuffer = bitmapToByteBuffer(resizedBitmap)
-                        emit(
-                            Pair(
-                                imageBuffer,
-                                Pair(uri, Size(resizedBitmap.width, resizedBitmap.height))
-                            )
-                        )
-                    }
-                }
-                .buffer()
-                .collect { (imageBuffer, uriAndSize) ->
-                    val imageEmbedding =
-                        clipAndroid.encodeImageNoResize(
-                            imageBuffer,
-                            uriAndSize.second.width,
-                            uriAndSize.second.height,
-                            NUM_THREADS,
-                            embeddingDim,
-                            true
-                        )
-                    imagesDB.add(uriAndSize.first.toString(), imageEmbedding)
-                    mainScope { insertedImagesCountState.value += 1 }
-                }
-            mainScope {
-                isInsertingImagesState.value = false
-                insertedImagesCountState.value = 0
+            selectedImagesUriListState.value.forEach { uri ->
+                val bitmap = getFixedBitmap(context, uri)
+                val resizedBitmap = Bitmap.createScaledBitmap(
+                    bitmap,
+                    clipAndroid.visionHyperParameters?.imageSize ?: 224,
+                    clipAndroid.visionHyperParameters?.imageSize ?: 224,
+                    true
+                )
+                val imageBuffer = bitmapToByteBuffer(resizedBitmap)
+                val imageEmbedding = clipAndroid.encodeImageNoResize(
+                    imageBuffer,
+                    clipAndroid.visionHyperParameters?.imageSize ?: 224,
+                    clipAndroid.visionHyperParameters?.imageSize ?: 224,
+                    4, // NUM_THREADS
+                    512, // embeddingDim
+                    true
+                )
+                imagesDB.add(uri.toString(), imageEmbedding, System.currentTimeMillis(), "New Album")
             }
+            loadImages() // Refresh the UI with the new images
         }
     }
 
