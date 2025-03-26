@@ -195,7 +195,6 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun CustomTopBar(viewModel: MainActivityViewModel) {
-        // Set the background color to black instead of the primary color.
         Surface(
             color = Color.Black,
             shadowElevation = 8.dp
@@ -206,7 +205,7 @@ class MainActivity : ComponentActivity() {
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left group: AddPhotos and Model Info
+                // Left group: Always show AddPhotos and Model Info.
                 Row(
                     modifier = Modifier.weight(1f),
                     horizontalArrangement = Arrangement.Start,
@@ -224,25 +223,38 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                // Center: "Photos" title text
+                // Center: Change text based on the state.
                 Text(
-                    text = "Photos",
+                    text = if (viewModel.isShowingResultsState.value) "Search results" else "Photos",
                     style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
                     color = Color.White,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                // Right group: RemoveAllPhotos button
+                // Right group: Show exit button if search is active; otherwise show RemoveAllPhotos.
                 Row(
                     modifier = Modifier.weight(1f),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RemoveAllPhotos(viewModel)
+                    if (viewModel.isShowingResultsState.value) {
+                        AppTooltip(tooltip = "Exit search results") {
+                            IconButton(onClick = { viewModel.closeResults() }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Exit search results",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    } else {
+                        RemoveAllPhotos(viewModel)
+                    }
                 }
             }
         }
     }
+
 
 
     @Composable
@@ -367,15 +379,25 @@ class MainActivity : ComponentActivity() {
         // State for the slider controlling image size.
         var sliderPosition by rememberSaveable { mutableStateOf(1f) } // Range: 0.5f (small) to 2.0f (large)
 
-        // Place a slider above the grid.
-        Column(modifier = Modifier.padding(8.dp)) {
-            Text(text = "Image Size", color = Color.White)
+        // Place a row with the label and slider on the same line.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Image Size",
+                color = Color.White,
+                modifier = Modifier.padding(start = 8.dp)
+            )
             Slider(
                 value = sliderPosition,
                 onValueChange = { sliderPosition = it },
-                valueRange = 0.5f..2.0f,
+                valueRange = 0.5f..1.5f,
                 steps = 3,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.weight(1f)
             )
         }
 
@@ -421,6 +443,7 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
+
 
 
 
