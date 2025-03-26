@@ -85,7 +85,10 @@ import androidx.compose.ui.window.DialogProperties
 import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.pager.PagerState
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.style.TextAlign
+
 
 class MainActivity : ComponentActivity() {
 
@@ -164,12 +167,13 @@ class MainActivity : ComponentActivity() {
                 // Rest of your UI
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    topBar = { CustomBottomBar(viewModel) }
+                    topBar = { CustomTopBar(viewModel) },
+                    containerColor = Color.Black  // Set scaffold background to black
                 ) { innerPadding ->
                     Column(
                         modifier = Modifier
                             .padding(innerPadding)
-                            .background(MaterialTheme.colorScheme.background)
+                            .background(Color.Black) // Also ensuring the column background is black
                     ) {
                         PhotosList(viewModel)
                         if (viewModel.isShowingResultsState.value) {
@@ -190,60 +194,56 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun CustomBottomBar(viewModel: MainActivityViewModel) {
+    private fun CustomTopBar(viewModel: MainActivityViewModel) {
+        // Set the background color to black instead of the primary color.
         Surface(
-            color = MaterialTheme.colorScheme.primary,
+            color = Color.Black,
             shadowElevation = 8.dp
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (viewModel.isShowingResultsState.value) {
-                    AppTooltip(tooltip = "Close Results") {
-                        IconButton(onClick = { viewModel.closeResults() }) {
+                // Left group: AddPhotos and Model Info
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AddPhotos(viewModel)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    AppTooltip(tooltip = "Model Info") {
+                        IconButton(onClick = { viewModel.showModelInfo() }) {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close Results",
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Model Info",
                                 tint = Color.White
                             )
                         }
                     }
-                    Text(
-                        text = "Search Results",
-                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.width(48.dp))
-                } else {
-                    Row {
-                        AddPhotos(viewModel)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        RemoveAllPhotos(viewModel)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        AppTooltip(tooltip = "Model Info") {
-                            IconButton(onClick = { viewModel.showModelInfo() }) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "Model Info",
-                                    tint = Color.White
-                                )
-                            }
-                        }
-                    }
-                    Text(
-                        text = "Photos",
-                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.width(48.dp))
+                }
+                // Center: "Photos" title text
+                Text(
+                    text = "Photos",
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
+                    color = Color.White,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                // Right group: RemoveAllPhotos button
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RemoveAllPhotos(viewModel)
                 }
             }
         }
     }
+
 
     @Composable
     private fun AddPhotos(viewModel: MainActivityViewModel) {
@@ -355,32 +355,55 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @OptIn(ExperimentalFoundationApi::class)
     @Composable
     private fun ColumnScope.PhotosList(viewModel: MainActivityViewModel) {
         val selectedImagesUris by remember { viewModel.selectedImagesUriListState }
         var selectedImageIndex by remember { mutableStateOf<Int?>(null) }
 
+        // Load images on first composition.
         LaunchedEffect(0) { viewModel.loadImages() }
 
+        // State for the slider controlling image size.
+        var sliderPosition by rememberSaveable { mutableStateOf(1f) } // Range: 0.5f (small) to 2.0f (large)
+
+        // Place a slider above the grid.
+        Column(modifier = Modifier.padding(8.dp)) {
+            Text(text = "Image Size", color = Color.White)
+            Slider(
+                value = sliderPosition,
+                onValueChange = { sliderPosition = it },
+                valueRange = 0.5f..2.0f,
+                steps = 3,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+
+        // Use an adaptive grid that adjusts its cell size based on the slider.
         LazyVerticalStaggeredGrid(
             modifier = Modifier
                 .background(Color.Transparent)
                 .fillMaxWidth()
                 .weight(1f),
-            columns = StaggeredGridCells.Fixed(2),
+            // The grid creates as many columns as possible with each cell having at least (100 * sliderPosition) dp.
+            columns = StaggeredGridCells.Adaptive(minSize = (100 * sliderPosition).dp),
             contentPadding = PaddingValues(4.dp)
         ) {
             items(selectedImagesUris.toList()) { uri ->
                 Card(
-                    modifier = Modifier.padding(4.dp),
+                    modifier = Modifier
+                        .padding(4.dp)
+                        // Adjust the height using sliderPosition so vertical size scales too.
+                        .height((150 * sliderPosition).dp),
                     shape = RoundedCornerShape(8.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                     onClick = {
                         selectedImageIndex = selectedImagesUris.indexOf(uri)
                     }
                 ) {
+                    // Make the image fill the card.
                     AsyncImage(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxSize(),
                         model = uri,
                         contentDescription = null,
                         contentScale = ContentScale.Crop
@@ -389,7 +412,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Show fullscreen viewer when image is selected
+        // Show fullscreen viewer when an image is selected.
         selectedImageIndex?.let { index ->
             ViewMediaDialog(
                 images = selectedImagesUris.toList(),
@@ -398,6 +421,8 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
+
+
 
     @Composable
     fun QueryInput(viewModel: MainActivityViewModel) {
@@ -429,7 +454,7 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.background(Color.Blue, CircleShape),
                 onClick = {
                     keyboardController?.hide()
-                    viewModel.processQuery(context) // Truyền context vào đây
+                    viewModel.processQuery(context)
                 }
             ) {
                 Icon(
@@ -465,14 +490,38 @@ class MainActivity : ComponentActivity() {
     private fun InsertImagesProgressDialog(viewModel: MainActivityViewModel) {
         val isInsertingImages by remember { viewModel.isInsertingImagesState }
         val insertedImagesCount by remember { viewModel.insertedImagesCountState }
+
         if (isInsertingImages) {
-            showProgressDialog()
-            setProgressDialogTitle("Inserting images...")
-            setProgressDialogText("Inserted $insertedImagesCount images")
+            Dialog(
+                onDismissRequest = {
+                    viewModel.isInsertingImagesState.value = false
+                    viewModel.loadImages()
+                },
+                properties = DialogProperties(
+                    dismissOnClickOutside = true
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp))
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Inserting images...",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Inserted $insertedImagesCount images",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
         } else {
             hideProgressDialog()
         }
-        AppProgressDialog()
     }
 
     @Composable

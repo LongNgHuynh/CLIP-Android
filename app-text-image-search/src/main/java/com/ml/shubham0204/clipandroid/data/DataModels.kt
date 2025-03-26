@@ -10,6 +10,7 @@ data class ImageEntity(
     @Id var id: Long = 0,
     var uri: String = "",
     var date: Long = 0,
+    var album: String? = null,
     @HnswIndex(dimensions = 512, distanceType = VectorDistanceType.DOT_PRODUCT)
     var embedding: FloatArray = floatArrayOf()
 )
